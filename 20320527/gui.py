@@ -108,10 +108,10 @@ def update_gui(progress_message, image=None):
         entry1.pack(side=tk.RIGHT)
 
         # Entry for black_ratio_threshold
-        entry2 = tk.Entry(button_frame, fg='grey')
-        entry2.insert(0, 'black_ratio_threshold')
-        entry2.bind('<FocusIn>', lambda event, text='black_ratio_threshold': on_entry_click(event, text))
-        entry2.bind('<FocusOut>', lambda event, text='black_ratio_threshold': on_focusout(event, text))
+        entry2 = tk.Entry(button_frame, fg='grey', width=30)
+        entry2.insert(0, 'black_ratio_threshold(float)')
+        entry2.bind('<FocusIn>', lambda event, text='black_ratio_threshold(float)': on_entry_click(event, text))
+        entry2.bind('<FocusOut>', lambda event, text='black_ratio_threshold(float)': on_focusout(event, text))
         entry2.pack(side=tk.RIGHT)
 
         # Entry for black_threshold
@@ -133,9 +133,9 @@ def update_gui(progress_message, image=None):
 
 def black_crop():
     # Get input values and provide default values
-    black_threshold = float(entry1.get() if entry1.get() != 'black_threshold' else 5)
-    black_ratio_threshold = float(entry2.get() if entry2.get() != 'black_ratio_threshold' else 1 / 3)
-    coordinate = entry3.get() if entry3.get() != 'x or y or both' else 'both'
+    black_threshold = float(entry1.get() if (entry1.get() != 'black_threshold' and entry1.get() != '') else 5)
+    black_ratio_threshold = float(entry2.get() if (entry2.get() != 'black_ratio_threshold(float)' and entry2.get() != '') else 1 / 3)
+    coordinate = entry3.get() if (entry3.get() != 'x or y or both' and entry3.get() != '') else 'both'
 
     # Loading images
     image_path = 'images/result.png'  # Replace it with your image file path
@@ -161,11 +161,11 @@ def black_crop():
 
     # crop picture
     cropped_image = image.crop((left, top, right + 1, bottom + 1))
-    cropped_image.save('images/result_cropped.png')  # Save the cropped image to a new file
+    cropped_image.save('images/result.png')  # Save the cropped image to a new file
 
     # Update the display of images in the Tkinter interface
     global render, load1
-    with Image.open("images/result_cropped.png") as load1:
+    with Image.open("images/result.png") as load1:
         width, height = load1.size
         new_height = 500
         new_width = int(width * (new_height / height))
