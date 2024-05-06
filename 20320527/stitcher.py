@@ -5,43 +5,50 @@ import numpy as np
 # Increase minimum match count for better stability in homography calculation
 MIN_MATCH_COUNT = 20
 FLANN_INDEX_KDTREE = 0
+index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+search_params = dict(checks=50)
 setup_logging()
 
 
 def stitch_images(img1, img2):
     # Initiate SIFT detector
-    sift = cv2.SIFT.create()
-    # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(img1, None)
-    kp2, des2 = sift.detectAndCompute(img2, None)
-    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    search_params = dict(checks=50)
-    flann = cv2.FlannBasedMatcher(index_params, search_params)
-    matches = flann.knnMatch(des1, des2, k=2)
+    detector = cv2.SIFT.create()
+
+    # find the keypoints and descriptors about these two pictures
+    kp1, des1 = detector.detectAndCompute(img1, None)
+    kp2, des2 = detector.detectAndCompute(img2, None)
+
+    matcher = cv2.FlannBasedMatcher(index_params, search_params)
+    matches = matcher.knnMatch(des1, des2, k=2)
+
     # store all the good matches as per Lowe's ratio test.
-    good = []
+    matches_after_test = []
     for m, n in matches:
         # Lowe's ratio test - increase threshold for better match quality
         if m.distance < 0.75 * n.distance:
-            good.append(m)
-    if len(good) < MIN_MATCH_COUNT:
-        print("Not enough matches are found - {}/{}".format(len(good), MIN_MATCH_COUNT))
+            matches_after_test.append(m)
+    if len(matches_after_test) < MIN_MATCH_COUNT:
+        print("Not enough matches are found - {}/{}".format(len(matches_after_test), MIN_MATCH_COUNT))
         return img1
-    #
-    src_pts = np.float32([kp1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
-    dst_pts = np.float32([kp2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+
+    last_points = np.float32([kp1[m.queryIdx].pt for m in matches_after_test]).reshape(-1, 1, 2)
+    latter_points = np.float32([kp2[m.trainIdx].pt for m in matches_after_test]).reshape(-1, 1, 2)
+
     w = img2.shape[1]
     h = img2.shape[0]
     offset_x = img1.shape[1]
     offset_y = img1.shape[1]
-    dst_pts1 = dst_pts.copy()
-    dst_pts1[:, :, 0] = dst_pts1[:, :, 0] + offset_x
-    dst_pts1[:, :, 1] = dst_pts1[:, :, 1] + offset_y
-    M, mask = cv2.findHomography(src_pts, dst_pts1, cv2.RANSAC, 5.0)
-    if M is None:
+
+    latter_pt_final = latter_points.copy()
+    latter_pt_final[:, :, 0] = latter_pt_final[:, :, 0] + offset_x
+    latter_pt_final[:, :, 1] = latter_pt_final[:, :, 1] + offset_y
+    check, mask = cv2.findHomography(last_points, latter_pt_final, cv2.RANSAC, 5.0)
+    if check is None:
         print("Homography could not be computed.")
         return img1
-    img_final = cv2.warpPerspective(img1, M, (w + offset_x, h + offset_y))
+
+    img_final = cv2.warpPerspective(img1, check, (w + offset_x, h + offset_y))
+
     for i in range(h):
         for j in range(w):
             # Weighted blending to reduce seam visibility
@@ -51,6 +58,7 @@ def stitch_images(img1, img2):
             elif np.all(img2[i][j] != 0):
                 img_final[i + offset_y][j + offset_x] = alpha * img_final[i + offset_y][j + offset_x] + (1 - alpha) * \
                                                         img2[i][j]
+
     # Convert to grayscale
     gray = cv2.cvtColor(img_final, cv2.COLOR_BGR2GRAY)
     # Threshold to find non-black pixels
